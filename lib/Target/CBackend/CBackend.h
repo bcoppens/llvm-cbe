@@ -232,7 +232,7 @@ private:
     // (also implies ContextCasted)
   };
 
-  void writeOperandDeref(Value *Operand);
+  void writeOperandDeref(Value *Operand, Type* StructReturnType = nullptr);
   void writeOperand(Value *Operand,
                     enum OperandContext Context = ContextNormal);
   void writeInstComputationInline(Instruction &I);

@@ -784,8 +784,10 @@ raw_ostream &CWriter::printFunctionProto(raw_ostream &Out,
     Out << MainArgs.begin()[0].first;
   } else {
     // Should this function actually return a struct by-value?
+#if 0 /* TODO make configurable */
     isStructReturn = PAL.hasAttributeAtIndex(1, Attribute::StructRet) ||
                      PAL.hasAttributeAtIndex(2, Attribute::StructRet);
+#endif
     // Get the return type for the function.
     Type *RetTy;
     if (!isStructReturn)
@@ -1777,12 +1779,18 @@ void CWriter::writeOperand(Value *Operand, enum OperandContext Context) {
 /// writeOperandDeref - Print the result of dereferencing the specified
 /// operand with '*'.  This is equivalent to printing '*' then using
 /// writeOperand, but avoids excess syntax in some cases.
-void CWriter::writeOperandDeref(Value *Operand) {
+void CWriter::writeOperandDeref(Value *Operand, Type* StructReturnType) {
   if (tryGetTypeOfAddressExposedValue(Operand)) {
     // Already something with an address exposed.
     writeOperandInternal(Operand);
   } else {
     Out << "*(";
+    if (StructReturnType) {
+      Out << "(";
+      printTypeName(Out, StructReturnType);
+      Out << "*)";
+    }
+
     writeOperand(Operand);
     Out << ")";
   }
@@ -3722,7 +3730,7 @@ bool CWriter::canDeclareLocalLate(Instruction &I) {
 
 void CWriter::printFunction(Function &F) {
   /// isStructReturn - Should this function actually return a struct by-value?
-  bool isStructReturn = F.hasStructRetAttr();
+  bool isStructReturn = false; // TODO make configurable F.hasStructRetAttr();
 
   cwriter_assert(!F.isDeclaration());
   if (F.hasDLLImportStorageClass())
@@ -3928,7 +3936,7 @@ void CWriter::visitReturnInst(ReturnInst &I) {
   CurInstr = &I;
 
   // If this is a struct return function, return the temporary struct.
-  bool isStructReturn = I.getParent()->getParent()->hasStructRetAttr();
+  bool isStructReturn = false; // TODO make configurable I.getParent()->getParent()->hasStructRetAttr();
 
   if (isStructReturn) {
     Out << "  return StructReturn;\n";
@@ -4893,9 +4901,21 @@ void CWriter::visitCallInst(CallInst &I) {
   // If this is a call to a struct-return function, assign to the first
   // parameter instead of passing it to the call.
   const AttributeList &PAL = I.getAttributes();
-  bool isStructRet = I.hasStructRetAttr();
+  bool isStructRet = false; // TODO make configurable I.hasStructRetAttr();
   if (isStructRet) {
-    writeOperandDeref(I.getArgOperand(0));
+    if (isa<Function>(Callee)) {
+      Function* CF = dyn_cast<Function>(Callee);
+      const AttributeList &PALCF = CF->getAttributes();
+      Out << "*(";
+      Out << "(";
+      // TODO: eigk zou het de PAL moeten zijn, maar gecast aan de RECHTERKANT van de operand; also TODO dunno waarom hij dat niet deed origineel via writeOperandDeref
+      printTypeName(Out, PALCF.getParamStructRetType(0));
+      Out << "*)";
+      writeOperand(I.getArgOperand(0));
+      Out << ")";
+    } else {
+      writeOperandDeref(I.getArgOperand(0), PAL.getParamStructRetType(0));
+    }
     Out << " = ";
   }
 
