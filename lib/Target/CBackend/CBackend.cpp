@@ -2707,12 +2707,20 @@ void CWriter::generateHeader(Module &M) {
         Out << "__thread ";
 
       Type *ElTy = I->getValueType();
-      unsigned Alignment = I->getAliaseeObject()->getAlignment();
-      bool IsOveraligned =
-          Alignment && Alignment > TD->getABITypeAlign(ElTy).value();
-      if (IsOveraligned) {
-        headerUseAligns();
-        Out << "__PREFIXALIGN__(" << Alignment << ") ";
+      unsigned Alignment = 0;
+      bool IsOveraligned = false;
+      if (ElTy->isSized()) {
+        unsigned Alignment = I->getAliaseeObject()->getAlignment();
+        IsOveraligned =
+            Alignment && Alignment > TD->getABITypeAlign(ElTy).value() && Alignment > TD->getABITypeAlign(ElTy).value();
+        if (IsOveraligned) {
+          headerUseAligns();
+          Out << "__PREFIXALIGN__(" << Alignment << ") ";
+        }
+      } else {
+        errs() << "DEBUGBART: ";
+        ElTy->dump();
+        errs() << "\n";
       }
       std::optional<std::string> CastAs{};
       if (ElTy->isFunctionTy()) {
