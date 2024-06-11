@@ -5387,7 +5387,7 @@ void CWriter::printGEPExpression(Value *Ptr, unsigned NumOperands,
   cwriter_assert(!FirstOp->getType()->isVectorTy());
   Type *IntoT = I.getIndexedType();
   ++I;
-  if (!isConstantNull(FirstOp)) {
+  if (!isConstantNull(FirstOp) || true /* TODO https://github.com/JuliaHubOSS/llvm-cbe/issues/193 */) {
     Out << "(&((";
     printTypeName(Out, IntoT);
     Out << "*)";
