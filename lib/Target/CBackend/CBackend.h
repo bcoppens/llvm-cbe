@@ -325,6 +325,8 @@ private:
   void visitInsertValueInst(InsertValueInst &I);
   void visitExtractValueInst(ExtractValueInst &I);
 
+  void visitFreezeInst(FreezeInst &I);
+
   void visitInstruction(Instruction &I) {
     CurInstr = &I;
     errorWithMessage("unsupported LLVM instruction");

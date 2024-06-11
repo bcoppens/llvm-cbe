@@ -5738,6 +5738,30 @@ void CWriter::visitExtractValueInst(ExtractValueInst &EVI) {
   Out << ")";
 }
 
+void CWriter::visitFreezeInst(FreezeInst &I) {
+  CurInstr = &I;
+  std::string Name = GetValueName(&I);
+
+  /* Suppose we have
+   * %1 = freeze i64 %0
+   * %2 = icmp eq i64 %1, 0 ; or whatever else uses %1
+   * In such cases, the semantics of freeze are that %1 should be loaded exactly once, subsequent reads should keep reading the same value
+   * We use volatile to recreate this behavior as follows:
+   * volatile int64_t val1_frozen = val_0;
+   * int64_t val1 = val1_frozen;
+   * if (val1 == 0) // or whatever
+   * this should guarantee that the value to freeze is only read once */
+
+  // This should be declared at the block top, but it should declare *both* (one of them is already declared there)...
+  Out << "volatile ";
+  printTypeName(Out, I.getType());
+  Out << " " << Name << "_frozen = ";
+  writeOperand(I.getOperand(0));
+  Out << ";\n";
+
+  Out << Name << " = " << Name << "_frozen";
+}
+
 [[noreturn]] void CWriter::errorWithMessage(const char *message) {
 #ifndef NDEBUG
   errs() << message;
