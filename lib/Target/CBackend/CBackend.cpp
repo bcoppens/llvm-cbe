@@ -3899,7 +3899,7 @@ void CWriter::printBasicBlock(BasicBlock *BB) {
     }
     if (!isInlinableInst(*II) && !isDirectAlloca(&*II)) {
       Out << "  ";
-      if (!isEmptyType(II->getType()) && !isInlineAsm(*II)) {
+      if (!isEmptyType(II->getType()) && !isInlineAsm(*II) && !isa<FreezeInst>(*II) /* TODO NEEDED? */) {
         if (canDeclareLocalLate(*II)) {
           printTypeName(Out, II->getType(), false) << ' ';
         }
