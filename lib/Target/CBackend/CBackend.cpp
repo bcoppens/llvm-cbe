@@ -200,11 +200,12 @@ bool CWriter::isInlinableInst(Instruction &I) const {
   // emit it inline where it would go.
   if (isEmptyType(I.getType()) || !I.hasOneUse() || I.isTerminator() ||
       isa<CallInst>(I) || isa<PHINode>(I) || isa<LoadInst>(I) ||
-      isa<VAArgInst>(I) || isa<InsertElementInst>(I) || isa<InsertValueInst>(I))
+      isa<VAArgInst>(I) || isa<InsertElementInst>(I) || isa<InsertValueInst>(I) ||
+      isa<FreezeInst>(I) /* TODO has to go in an earlier patch? */ || isa<InvokeInst>(I) || isa<ResumeInst>(I) || isa<LandingPadInst>(I))
     // Don't inline a load across a store or other bad things!
     return false;
 
-  // Must not be used in inline asm, extractelement, or shufflevector.
+  // Must not be used in inline asm, extractelement, or shufflevector. TODO: comment does not match code
   if (I.hasOneUse()) {
     Instruction &User = cast<Instruction>(*I.user_back());
     if (isInlineAsm(User))
@@ -3432,7 +3433,7 @@ void CWriter::generateHeader(Module &M) {
   Out << "}\n";
   Out << "\n";
   Out << "void __cxa_free_exception_BART(void* p) {\n";
-  Out << "  free(p);\n";
+  Out << "  // free(p);\n"; // TODO
   Out << "}\n";
   Out << "\n";
   Out << "struct {\n";

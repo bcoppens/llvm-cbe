@@ -35,7 +35,7 @@ bool CTargetMachine::addPassesToEmitFile(PassManagerBase &PM,
   // TargetPassConfig if TargetPassConfig supported TargetMachines that aren't
   // LLVMTargetMachines.
   //PM.add(createLowerInvokePass()); // TODO warn about possible semantic changes
-  PM.add(createUnreachableBlockEliminationPass());
+  //PM.add(createUnreachableBlockEliminationPass());
 
   // Lower atomic operations to libcalls
   PM.add(createAtomicExpandPass());
