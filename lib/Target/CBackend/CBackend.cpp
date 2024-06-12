@@ -3417,6 +3417,46 @@ void CWriter::generateHeader(Module &M) {
     printIntrinsicDefinition(**I, Out);
   }
 
+  /* TODO put this elsewhere and cleaner */
+  /* ALSO ACTUALLY FIX IT TODO, TODO especially catching types */
+  Out << "#include <setjmp.h>\n";
+  Out << "/* Exception hacks */\n";
+  Out << "struct ExceptionState {\n";
+  Out << "  jmp_buf buf;\n";
+  Out << "};\n";
+  Out << "static __thread struct ExceptionState ExceptionStates[256];\n";
+  Out << "static __thread int jmp_idx = 0;\n";
+  Out << "\n";
+  Out << "void* __cxa_allocate_exception_BART(uint64_t size) {\n";
+  Out << "  return malloc(size);\n";
+  Out << "}\n";
+  Out << "\n";
+  Out << "void __cxa_free_exception_BART(void* p) {\n";
+  Out << "  free(p);\n";
+  Out << "}\n";
+  Out << "\n";
+  Out << "struct {\n";
+  Out << "  void* o;\n";
+  Out << "  void* typeinfo;\n";
+  Out << "  void* destructor;\n";
+  Out << "} cbe_exception; // TODO stack?\n";
+  Out << "\n";
+  Out << "void __cxa_throw_BART(void* o, void* typeinfo, void* destructor) {\n";
+  Out << "  cbe_exception.o = o;\n";
+  Out << "  cbe_exception.typeinfo = typeinfo;\n";
+  Out << "  cbe_exception.destructor = destructor;\n";
+  Out << "  longjmp(ExceptionStates[--jmp_idx].buf, 1);\n";
+  Out << "}\n";
+  Out << "\n";
+  Out << "\n";
+  Out << "void* __cxa_begin_catch_BART(void* _48) { return _48; }\n";
+  Out << "void __cxa_end_catch_BART(void) {}\n";
+  Out << "\n";
+  Out << "struct cbe_landingpad { void* field0; uint32_t field1; };\n";
+  Out << "\n";
+  Out << "struct cbe_landingpad cbe_get_landingpad() { struct cbe_landingpad r; r.field1 = 1; r.field0 = cbe_exception.o; return r; }\n";
+  Out << "void __attribute__((noreturn)) __cbe_resume(struct cbe_landingpad l) __attribute__((noreturn)) { longjmp(ExceptionStates[--jmp_idx].buf, 1); }\n";
+
   if (!M.empty())
     Out << "\n\n/* Function Bodies */\n";
 
@@ -4951,7 +4991,20 @@ void CWriter::visitCallInst(CallInst &I) {
     Out << ')';
   } else {
     cwriter_assert(isa<Function>(Callee));
-    Out << GetValueName(Callee);
+    auto name = Callee->getName();
+    if (name == "__cxa_allocate_exception") {
+      Out << "__cxa_allocate_exception_BART";
+    } else if (name == "__cxa_free_exception") {
+      Out << "__cxa_free_exception_BART";
+    } else if (name == "__cxa_throw") {
+      Out << "__cxa_throw_BART";
+    } else if (name == "__cxa_begin_catch") {
+      Out << "__cxa_begin_catch_BART";
+    } else if (name == "__cxa_end_catch") {
+      Out << "__cxa_end_catch_BART";
+    } else {
+      Out << GetValueName(Callee);
+    }
   }
 
   Out << '(';
@@ -5788,6 +5841,209 @@ void CWriter::visitFreezeInst(FreezeInst &I) {
   Out << ";\n";
 
   Out << Name << " = " << Name << "_frozen";
+}
+
+void CWriter::visitInvokeInst(InvokeInst &I) {
+  /* transform invoke into
+    if (setjmp(jmp_bufs[jmp_idx++]) == 0) {
+      a();
+      jmp_idx--;
+    } else {
+      goto lpad;
+    }
+  */
+
+  Out << "if (setjmp(ExceptionStates[jmp_idx++].buf) == 0) {\n";
+
+  if (I.hasNUsesOrMore(1)) {
+    writeOperand(&I);
+    Out << " = ";
+  }
+
+  /* TODO: factor back into CallInst */
+  ///////////////////////////////////////////////////////////////////////////////////////
+    if (I.getFunction()->getName() == "_ZN11MenuManager9push_menuEi") {
+    errs() << "HALLO BART2\n";
+    I.dump();
+  }
+  CurInstr = &I;
+
+#if 0
+  if (isa<InlineAsm>(I.getCalledOperand()))
+    return visitInlineAsm(I);
+#endif
+#if 0
+  // Handle intrinsic function calls first...
+  if (Function *F = I.getCalledFunction()) {
+    auto ID = F->getIntrinsicID();
+    if (ID != Intrinsic::not_intrinsic && visitBuiltinCall(I, ID))
+      return;
+  }
+#endif
+  Value *Callee = I.getCalledOperand();
+
+  // If this is a call to a struct-return function, assign to the first
+  // parameter instead of passing it to the call.
+  const AttributeList &PAL = I.getAttributes();
+  bool isStructRet = false; // I.hasStructRetAttr();
+  if (isStructRet) {
+    if (I.getFunction()->getName() == "_ZN11MenuManager9push_menuEi") {
+      errs() << "HALLO BART ISSTRUCTRET\n";
+    }
+
+    if (isa<Function>(Callee)) {
+      Function* CF = dyn_cast<Function>(Callee);
+      const AttributeList &PALCF = CF->getAttributes();
+#if 0
+      if (I.getFunction()->getName() == "_ZN11MenuManager9push_menuEi") {
+        errs() << "HALLO BART ISSTRUCTRET BIS" << PAL.getParamStructRetType(0)->getStructName() << " " << PALCF.getParamStructRetType(0)->getStructName() << "\n";
+      }
+      writeOperandDeref(I.getArgOperand(0), PALCF.getParamStructRetType(0));
+#endif
+    Out << "*(";
+      Out << "(";
+      // TODO: eigk zou het de PAL moeten zijn, maar gecast aan de RECHTERKANT van de operand; also TODO dunno waarom hij dat niet deed origineel via writeOperandDeref
+      printTypeName(Out, PALCF.getParamStructRetType(0));
+      Out << "*)";
+    writeOperand(I.getArgOperand(0));
+    Out << ")";
+    } else {
+      writeOperandDeref(I.getArgOperand(0), PAL.getParamStructRetType(0));
+    }
+    Out << " = ";
+  }
+
+  if (I.isTailCall())
+    Out << " /*tail*/ ";
+
+  // If we are calling anything other than a function, then we need to cast
+  // since it will be an opaque pointer.
+  bool NeedsCast = !isa<Function>(Callee);
+
+  if (I.getFunction()->getName() == "_ZN11MenuManager9push_menuEi") {
+      errs() << "HALLO BART2" << (int)NeedsCast << "\n";
+      errs() << " CalledFunction: " << I.getCalledFunction() << "\n";
+      if (I.getCalledFunction()) {
+        errs() << " " << I.getCalledFunction()->getName() << "\n";
+        I.getCalledFunction()->dump();
+      }
+      errs() << "getCalledOperand: " << Callee << "\n";
+      if (Callee)
+        errs() << " " << Callee->getName() << "\n";
+    }
+
+  // GCC is a real PITA.  It does not permit codegening casts of functions to
+  // function pointers if they are in a call (it generates a trap instruction
+  // instead!).  We work around this by inserting a cast to void* in between
+  // the function and the function pointer cast.  Unfortunately, we can't just
+  // form the constant expression here, because the folder will immediately
+  // nuke it.
+  //
+  // Note finally, that this is completely unsafe.  ANSI C does not guarantee
+  // that void* and function pointers have the same size. :( To deal with this
+  // in the common case, we handle casts where the number of arguments passed
+  // match exactly.
+  if (ConstantExpr *CE = dyn_cast<ConstantExpr>(Callee))
+    if (CE->isCast())
+      if (Function *RF = dyn_cast<Function>(CE->getOperand(0))) {
+        NeedsCast = true;
+        Callee = RF;
+        if (I.getFunction()->getName() == "_ZN11MenuManager9push_menuEi") {
+          errs() << "HALLO BART HOIHOI\n";
+        }
+      }
+
+  if (NeedsCast) {
+    // Ok, just cast the pointer type.
+    Out << "((" << getFunctionName(&I) << "*)(void*)";
+    writeOperand(Callee, ContextCasted);
+    Out << ')';
+  } else {
+    cwriter_assert(isa<Function>(Callee));
+    auto name = Callee->getName();
+    if (name == "__cxa_allocate_exception") {
+      Out << "__cxa_allocate_exception_BART";
+    } else if (name == "__cxa_free_exception") {
+      Out << "__cxa_free_exception_BART";
+    } else if (name == "__cxa_throw") {
+      Out << "__cxa_throw_BART";
+    } else if (name == "__cxa_begin_catch") {
+      Out << "__cxa_begin_catch_BART";
+    } else if (name == "__cxa_end_catch") {
+      Out << "__cxa_end_catch_BART";
+    } else {
+      Out << GetValueName(Callee);
+    }
+  }
+
+  Out << '(';
+
+  bool PrintedArg = false;
+  FunctionType *FTy = I.getFunctionType();
+  if (FTy->isVarArg() && !FTy->getNumParams()) {
+    Out << "0 /*dummy arg*/";
+    PrintedArg = true;
+  }
+
+  unsigned NumDeclaredParams = FTy->getNumParams();
+  auto CS(&I);
+  auto AI = CS->arg_begin(), AE = CS->arg_end();
+  unsigned ArgNo = 0;
+  if (isStructRet) { // Skip struct return argument.
+    ++AI;
+    ++ArgNo;
+  }
+
+  Function *F = I.getCalledFunction();
+  if (F) {
+    StringRef Name = F->getName();
+    // emit cast for the first argument to type expected by header prototype
+    // the jmp_buf type is an array, so the array-to-pointer decay adds the
+    // strange extra *'s
+    if (Name == "sigsetjmp")
+      Out << "*(sigjmp_buf*)";
+    else if (Name == "setjmp")
+      Out << "*(jmp_buf*)";
+  }
+
+  for (; AI != AE; ++AI, ++ArgNo) {
+    if (PrintedArg)
+      Out << ", ";
+    if (ArgNo < NumDeclaredParams &&
+        (*AI)->getType() != FTy->getParamType(ArgNo)) {
+      Out << '(';
+      printTypeName(
+          Out, FTy->getParamType(ArgNo),
+          /*isSigned=*/PAL.hasAttributeAtIndex(ArgNo + 1, Attribute::SExt));
+      Out << ')';
+    }
+    // Check if the argument is expected to be passed by value.
+    if (I.getAttributes().hasAttributeAtIndex(ArgNo + 1, Attribute::ByVal))
+      writeOperandDeref(*AI);
+    else
+      writeOperand(*AI, ContextCasted);
+    PrintedArg = true;
+  }
+  Out << ')';
+    ///////////////////////////////////////////////////////////////////////////////////////
+
+  Out << ";      jmp_idx--;\n";
+  Out << "      goto ";
+  writeOperand(I.getNormalDest()) ;
+  Out << ";\n} else {\n";
+  Out << "      goto ";
+  writeOperand(I.getUnwindDest());
+  Out << ";\n  }\n";
+}
+
+void CWriter::visitResumeInst(ResumeInst &I) {
+    Out << "__cbe_resume(";
+    writeOperand(I.getOperand(0));
+    Out << ");\n";
+    Out << "exit(-1);\n"; // make Tigress happy
+}
+void CWriter::visitLandingPadInst(LandingPadInst &I) {
+  Out << "cbe_get_landingpad()\n";
 }
 
 [[noreturn]] void CWriter::errorWithMessage(const char *message) {

@@ -49,7 +49,7 @@ public:
   CBEMCAsmInfo() { PrivateGlobalPrefix = ""; }
 };
 
-using FunctionInfoVariant = std::variant<const Function *, const CallInst *>;
+using FunctionInfoVariant = std::variant<const Function *, const CallInst *, const InvokeInst *>;
 
 /// CWriter - This class is the main chunk of code that converts an LLVM
 /// module to a C translation unit.
@@ -291,12 +291,10 @@ private:
   void visitBranchInst(BranchInst &I);
   void visitSwitchInst(SwitchInst &I);
   void visitIndirectBrInst(IndirectBrInst &I);
-  void visitInvokeInst(InvokeInst &I) {
-    llvm_unreachable("Lowerinvoke pass didn't work!");
-  }
-  void visitResumeInst(ResumeInst &I) {
-    llvm_unreachable("DwarfEHPrepare pass didn't work!");
-  }
+  void visitInvokeInst(InvokeInst &I);
+  void visitResumeInst(ResumeInst &I);
+  void visitLandingPadInst(LandingPadInst &I);
+
   void visitUnreachableInst(UnreachableInst &I);
 
   void visitPHINode(PHINode &I);

@@ -34,7 +34,7 @@ bool CTargetMachine::addPassesToEmitFile(PassManagerBase &PM,
   // Remove exception handling with LowerInvokePass. This would be done with
   // TargetPassConfig if TargetPassConfig supported TargetMachines that aren't
   // LLVMTargetMachines.
-  PM.add(createLowerInvokePass());
+  //PM.add(createLowerInvokePass()); // TODO warn about possible semantic changes
   PM.add(createUnreachableBlockEliminationPass());
 
   // Lower atomic operations to libcalls
