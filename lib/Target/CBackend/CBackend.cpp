@@ -6029,6 +6029,7 @@ void CWriter::visitInvokeInst(InvokeInst &I) {
     ///////////////////////////////////////////////////////////////////////////////////////
 
   Out << ";      jmp_idx--;\n";
+  printPHICopiesForSuccessor(I.getParent(), I.getNormalDest(), 2); // TODO fix indent arguments (also the jmp_idx etc)
   Out << "      goto ";
   writeOperand(I.getNormalDest()) ;
   Out << ";\n} else {\n";
