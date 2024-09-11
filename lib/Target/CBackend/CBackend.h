@@ -49,7 +49,7 @@ public:
   CBEMCAsmInfo() { PrivateGlobalPrefix = ""; }
 };
 
-using FunctionInfoVariant = std::variant<const Function *, const CallInst *, const InvokeInst *>;
+using FunctionInfoVariant = std::variant<const Function *, const CallBase *>;
 
 /// CWriter - This class is the main chunk of code that converts an LLVM
 /// module to a C translation unit.

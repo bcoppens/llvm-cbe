@@ -67,7 +67,7 @@ VisitFunctionInfoVariant(TReturn (Function::*FunctionOverload)(TArgs...) const,
                          FunctionInfoVariant FIV, TArgs... Args) {
   if (auto F = std::get_if<const Function *>(&FIV)) {
     return (*F->*FunctionOverload)(Args...);
-  } else if (auto CI = std::get_if<const CallInst *>(&FIV)) {
+  } else if (auto CI = std::get_if<const CallBase *>(&FIV)) {
     return (*CI->*CallInstOverload)(Args...);
   } else {
     llvm_unreachable("Unexpected type in a FunctionInfoVariant");
@@ -81,32 +81,32 @@ auto TryAsFunction(FunctionInfoVariant FIV) {
 
 auto GetFunctionType(FunctionInfoVariant FIV) {
   return VisitFunctionInfoVariant(&Function::getFunctionType,
-                                  &CallInst::getFunctionType, FIV);
+                                  &CallBase::getFunctionType, FIV);
 }
 
 auto GetAttributes(FunctionInfoVariant FIV) {
   return VisitFunctionInfoVariant(&Function::getAttributes,
-                                  &CallInst::getAttributes, FIV);
+                                  &CallBase::getAttributes, FIV);
 }
 
 auto GetReturnType(FunctionInfoVariant FIV) {
-  return VisitFunctionInfoVariant(&Function::getReturnType, &CallInst::getType,
+  return VisitFunctionInfoVariant(&Function::getReturnType, &CallBase::getType,
                                   FIV);
 }
 
 auto GetParamStructRetType(FunctionInfoVariant FIV) {
   return VisitFunctionInfoVariant(&Function::getParamStructRetType,
-                                  &CallInst::getParamStructRetType, FIV, 0u);
+                                  &CallBase::getParamStructRetType, FIV, 0u);
 }
 
 auto GetParamByValType(FunctionInfoVariant FIV, unsigned ArgNo) {
   return VisitFunctionInfoVariant(&Function::getParamByValType,
-                                  &CallInst::getParamByValType, FIV, ArgNo);
+                                  &CallBase::getParamByValType, FIV, ArgNo);
 }
 
 auto GetCallingConv(FunctionInfoVariant FIV) {
   return VisitFunctionInfoVariant(&Function::getCallingConv,
-                                  &CallInst::getCallingConv, FIV);
+                                  &CallBase::getCallingConv, FIV);
 }
 
 extern "C" void LLVMInitializeCBackendTarget() {
